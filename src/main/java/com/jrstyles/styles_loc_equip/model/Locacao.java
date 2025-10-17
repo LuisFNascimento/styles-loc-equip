@@ -2,6 +2,8 @@ package com.jrstyles.styles_loc_equip.model;
 
 import jakarta.persistence.*;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "locacoes")
@@ -12,63 +14,52 @@ public class Locacao {
     private Long id;
 
     @ManyToOne(optional = false)
-    private Equipamento equipamento;
-
-    @Column(nullable = false)
-    private String cliente;
+    private Cliente cliente;
 
     @Column(nullable = false)
     private LocalDate dataInicio;
 
     @Column(nullable = false)
-    private LocalDate dataFim;
-
-    @Column(nullable = false)
     private Integer dias;
-
-    @Column(nullable = false)
-    private Double valorTotal;
 
     @Column(nullable = false)
     private Boolean devolvido = false;
 
-    public Locacao() {}
+    @OneToMany(mappedBy = "locacao", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ItemLocacao> itens = new ArrayList<>();
 
-    public Locacao(Equipamento equipamento, String cliente, LocalDate dataInicio, Integer dias) {
-        this.equipamento = equipamento;
-        this.cliente = cliente;
-        this.dataInicio = dataInicio;
-        this.dias = dias;
-        this.dataFim = dataInicio.plusDays(dias);
-        this.valorTotal = calcularValorTotal();
-        this.devolvido = false;
-    }
-
-    public Double calcularValorTotal() {
-        return equipamento.getValorDiaria() * dias;
-    }
+    @Column(nullable = false)
+    private Double valorTotal = 0.0;
 
     // Getters e Setters
     public Long getId() { return id; }
-
-    public Equipamento getEquipamento() { return equipamento; }
-    public void setEquipamento(Equipamento equipamento) { this.equipamento = equipamento; }
-
-    public String getCliente() { return cliente; }
-    public void setCliente(String cliente) { this.cliente = cliente; }
-
+    public Cliente getCliente() { return cliente; }
+    public void setCliente(Cliente cliente) { this.cliente = cliente; }
     public LocalDate getDataInicio() { return dataInicio; }
     public void setDataInicio(LocalDate dataInicio) { this.dataInicio = dataInicio; }
-
-    public LocalDate getDataFim() { return dataFim; }
-    public void setDataFim(LocalDate dataFim) { this.dataFim = dataFim; }
-
     public Integer getDias() { return dias; }
     public void setDias(Integer dias) { this.dias = dias; }
-
-    public Double getValorTotal() { return valorTotal; }
-    public void setValorTotal(Double valorTotal) { this.valorTotal = valorTotal; }
-
     public Boolean getDevolvido() { return devolvido; }
     public void setDevolvido(Boolean devolvido) { this.devolvido = devolvido; }
+    public List<ItemLocacao> getItens() { return itens; }
+
+    public Double getValorTotal() { return valorTotal; }
+
+    // Métodos auxiliares
+    public void adicionarEquipamento(Equipamento equipamento, Integer quantidade) {
+        ItemLocacao item = new ItemLocacao();
+        item.setLocacao(this);
+        item.setEquipamento(equipamento);
+        item.setQuantidade(quantidade);
+        item.setValorUnitario(equipamento.getValorDiaria() * dias);
+        item.setValorTotal(item.getValorUnitario() * quantidade);
+        this.itens.add(item);
+        calcularValoresTotais();
+    }
+
+    public void calcularValoresTotais() {
+        this.valorTotal = itens.stream()
+                .mapToDouble(ItemLocacao::getValorTotal)
+                .sum();
+    }
 }

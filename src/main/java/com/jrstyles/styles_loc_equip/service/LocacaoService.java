@@ -1,50 +1,54 @@
 package com.jrstyles.styles_loc_equip.service;
 
-import com.jrstyles.styles_loc_equip.exception.ResourceNotFoundException;
 import com.jrstyles.styles_loc_equip.model.Equipamento;
 import com.jrstyles.styles_loc_equip.model.Locacao;
+import com.jrstyles.styles_loc_equip.model.ItemLocacao;
 import com.jrstyles.styles_loc_equip.repository.LocacaoRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
 
 @Service
 public class LocacaoService {
-    private final LocacaoRepository repo;
-    private final EquipamentoService equipamentoService;
 
-    public LocacaoService(LocacaoRepository repo, EquipamentoService equipamentoService) {
-        this.repo = repo;
-        this.equipamentoService = equipamentoService;
+    private final LocacaoRepository locacaoRepository;
+
+    public LocacaoService(LocacaoRepository locacaoRepository) {
+        this.locacaoRepository = locacaoRepository;
+    }
+
+    public List<Locacao> listarTodos() {
+        return locacaoRepository.findAll();
     }
 
     @Transactional
     public Locacao registrar(Locacao locacao) {
-        Equipamento equipamento = equipamentoService.buscarPorId(locacao.getEquipamento().getId());
-        if (!equipamento.getDisponivel()) {
-            throw new IllegalStateException("Equipamento não disponível para locação");
+        // Garantir que equipamentos não estão locados
+        for (ItemLocacao item : locacao.getItens()) {
+            Equipamento eq = item.getEquipamento();
+            if (!eq.getDisponivel()) {
+                throw new RuntimeException("Equipamento " + eq.getNome() + " já está alugado.");
+            }
+            eq.setDisponivel(false); // marca como indisponível
         }
-        equipamento.setDisponivel(false);
-        equipamentoService.atualizar(equipamento.getId(), equipamento);
-        return repo.save(locacao);
+
+        locacao.calcularValoresTotais();
+        return locacaoRepository.save(locacao);
     }
 
     @Transactional
-    public Locacao devolver(Long locacaoId) {
-        Locacao loc = repo.findById(locacaoId).orElseThrow(() -> new ResourceNotFoundException("Locação não encontrada"));
-        Equipamento e = loc.getEquipamento();
-        e.setDisponivel(true);
-        equipamentoService.atualizar(e.getId(), e);
-        // opcional: remover a locação ou marcar data de devolucao
-        return loc;
+    public void devolver(Long id) {
+        Locacao loc = locacaoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Locação não encontrada"));
+        loc.setDevolvido(true);
+        loc.getItens().forEach(item -> item.getEquipamento().setDisponivel(true));
+        locacaoRepository.save(loc);
     }
-
-    public List<Locacao> listarTodos() {
-        return repo.findAll();
-    }
-
+    @Transactional(readOnly = true)
     public Locacao buscarPorId(Long id) {
-        return repo.findById(id).orElseThrow(() -> new ResourceNotFoundException("Locação não encontrada"));
+        return locacaoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Locação não encontrada"));
     }
-}
 
+}

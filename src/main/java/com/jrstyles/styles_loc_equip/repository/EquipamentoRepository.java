@@ -5,6 +5,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface EquipamentoRepository extends JpaRepository<Equipamento, Long> {
+
+    // 🔹 Busca somente os disponíveis
     List<Equipamento> findByDisponivelTrue();
 }
 
